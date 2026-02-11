@@ -40,13 +40,15 @@
         <File path="src/TIA/TIA.vhd" type="file.vhdl" enable="1"/>
         <File path="src/TIA/VGAColorTable.vhd" type="file.vhdl" enable="1"/>
         <File path="src/TIA/audio_argh2600.vhd" type="file.vhdl" enable="1"/>
-        <File path="src/gowin_pll/gowin_pll_ntsc_60k.vhd" type="file.vhdl" enable="1"/>
         <File path="src/gowin_sdpb/gowin_sdpb_gw5a.vhd" type="file.vhdl" enable="1"/>
         <File path="src/t65/T65.vhd" type="file.vhdl" enable="1"/>
         <File path="src/t65/T65_ALU.vhd" type="file.vhdl" enable="1"/>
         <File path="src/t65/T65_MCode.vhd" type="file.vhdl" enable="1"/>
         <File path="src/t65/T65_Pack.vhd" type="file.vhdl" enable="1"/>
         <File path="src/tang/console60k/a2600_top_tc60k.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/tang/console60k/pll_init.v" type="file.verilog" enable="1"/>
+        <File path="src/tang/console60k/gowin_pll_ntsc_60k.vhd" type="file.vhdl" enable="1"/>
+        <File path="src/tang/console60k/gowin_pll_ntsc_60k_mod.vhd" type="file.vhdl" enable="1"/>
         <File path="src/tang/console60k/a2600_top_tc60k.cst" type="file.cst" enable="1"/>
         <File path="src/tang/console60k/a2600_top_tc60k.sdc" type="file.sdc" enable="1"/>
     </FileList>
