@@ -14,8 +14,7 @@ entity A2600_top is
   port
   (
     bl616_jtagsel : in std_logic;
-    jtagseln    : out std_logic := '0';
-    reconfign   : out std_logic := 'Z';
+    jtagseln    : out std_logic;
     clk_50mhz   : in std_logic; -- XO
     key_reset_n : in std_logic; -- S2 button
     key_user_n  : in std_logic; -- S1 button
@@ -46,7 +45,7 @@ entity A2600_top is
     lcd_hs      : out std_logic; -- lcd horizontal synchronization
     lcd_vs      : out std_logic; -- lcd vertical synchronization        
     lcd_de      : out std_logic; -- lcd data enable     
-    lcd_bl      : out std_logic; -- lcd backlight control
+    lcd_bl      : out std_logic := 'Z'; -- lcd backlight control
     lcd_r       : out std_logic_vector(7 downto 0);  -- lcd red
     lcd_g       : out std_logic_vector(7 downto 0);  -- lcd green
     lcd_b       : out std_logic_vector(7 downto 0);  -- lcd blue
@@ -82,7 +81,7 @@ architecture Behavioral_top of A2600_top is
 signal clk            : std_logic;
 signal clk_cpu        : std_logic;
 signal clk_14         : std_logic;
-signal pll_locked     : std_logic;
+signal pll_locked     : std_logic := '0';
 signal clk_pixel_x5   : std_logic;
 attribute syn_keep : integer;
 attribute syn_keep of clk_cpu      : signal is 1;
@@ -154,14 +153,14 @@ signal mouse_strobe   : std_logic;
 signal osd_status     : std_logic;
 signal ws2812_color   : std_logic_vector(23 downto 0);
 signal system_reset   : std_logic_vector(1 downto 0);
-signal sd_img_size    : std_logic_vector(31 downto 0);
-signal sd_img_size_d  : std_logic_vector(31 downto 0);
-signal sd_img_mounted : std_logic_vector(4 downto 0);
+signal sd_img_size    : std_logic_vector(63 downto 0);
+signal sd_img_size_d  : std_logic_vector(63 downto 0);
+signal sd_img_mounted : std_logic_vector(7 downto 0);
 signal img_present    : std_logic;
 signal sc_lock        : std_logic;
 signal force_bs_lock  : std_logic_vector(4 downto 0);
-signal sd_rd          : std_logic_vector(4 downto 0);
-signal sd_wr          : std_logic_vector(4 downto 0);
+signal sd_rd          : std_logic_vector(7 downto 0);
+signal sd_wr          : std_logic_vector(7 downto 0);
 signal sd_lba         : std_logic_vector(31 downto 0);
 signal sd_busy        : std_logic;
 signal sd_done        : std_logic;
@@ -173,14 +172,14 @@ signal sd_change      : std_logic;
 signal sdc_int        : std_logic;
 signal sdc_iack       : std_logic;
 signal int_ack        : std_logic_vector(7 downto 0);
-signal spi_ext        : std_logic;
+signal spi_ext        : std_logic :='0';
 signal spi_io_din     : std_logic;
 signal spi_io_ss      : std_logic;
 signal spi_io_clk     : std_logic;
+attribute syn_keep of spi_io_clk : signal is 1;
 signal spi_io_dout    : std_logic;
 signal system_wide_screen : std_logic;
 signal leds           : std_logic_vector(5 downto 0);
-signal system_leds    : std_logic_vector(1 downto 0);
 signal db9_joy        : std_logic_vector(5 downto 0);
 signal hblank          : std_logic;
 signal vblank          : std_logic;
@@ -250,7 +249,6 @@ signal ioctl_wait      : std_logic := '0';
 signal dl_addr         : std_logic_vector(15 downto 0);
 signal dl_data         : std_logic_vector(7 downto 0);
 signal dl_wr           : std_logic;
-signal ioctl_file_ext  : std_logic_vector(31 downto 0) := x"00000000";
 signal rom_a           : std_logic_vector(15 downto 0);
 signal rom_do          : std_logic_vector(7 downto 0);
 signal reset2600       : std_logic;
@@ -301,6 +299,7 @@ signal btn_diff_r       : std_logic;
 signal btn_pause        : std_logic;
 signal spi_intn         : std_logic;
 signal boot_button_detected : std_logic := '1';
+signal sys_jtagseln     : std_logic;
 
 component CLKDIV
     generic (
@@ -316,17 +315,11 @@ end component;
 
 begin
 
-  process (pll_locked)
-  begin
-    if rising_edge(pll_locked) then
-      boot_button_detected <= '1' when key_user_n = '0' or key_reset_n = '0' else '0';
-    end if;
-  end process;
-
   -- enable JTAG if any button has been pressed during boot and also once
   -- the external FPGA Companion has been seen
-  jtagseln <= '1' when (not pll_locked or boot_button_detected or spi_ext or bl616_jtagsel) = '0' else '0';
-  reconfign <= 'Z';  -- <= '0' when bl616_RECONFIGn = '0' else 'Z';
+  jtagseln <= not bl616_jtagsel; -- or spi_ext);
+  sys_jtagseln <= not (not pll_locked or bl616_jtagsel);
+
   -- BL616 console to hw pins for external USB-UART adapter
   bl616_mon_tx <= uart_rx;
 
@@ -423,10 +416,10 @@ sdc_iack <= int_ack(3);
 
 sd_card_inst: entity work.sd_card
 generic map (
-    CLK_DIV  => 1
+    CLK_DIV  => 0
   )
     port map (
-    rstn            => pll_locked, 
+    rstn            => sys_jtagseln, 
     clk             => clk,
   
     -- SD card signals
@@ -448,7 +441,6 @@ generic map (
     -- translate between sector/track/side and lba sector
     image_size      => sd_img_size,           -- length of image file
     image_mounted   => sd_img_mounted,
-    ioctl_file_ext  => ioctl_file_ext,
 
     -- user read sector command interface (sync with clk)
     rstart          => sd_rd,
@@ -509,7 +501,7 @@ port map(
       lcd_r    => lcd_r,
       lcd_g    => lcd_g,
       lcd_b    => lcd_b,
-      lcd_bl   => lcd_bl,
+      lcd_bl   => open, -- lcd_bl,
 
       hp_bck   => hp_bck,
       hp_ws    => hp_ws,
@@ -526,12 +518,15 @@ port map(
 -- core    28800000
 -- pixel    3600000
 
-mainclock: entity work.Gowin_PLL_ntsc_138k
+mainclock: entity work.Gowin_PLL_ntsc_138k_MOD
     port map (
       lock    => pll_locked,
       clkout0 => clk_pixel_x5,
       clkin   => clk_50mhz,
-      init_clk => clk_50mhz
+      reset   => '0',
+      icpsel  => (others => '0'),
+      lpfres  => (others => '0'),
+      lpfcap  => (others => '0')
     );
 
 div1_inst: CLKDIV
@@ -867,7 +862,7 @@ end process;
 mcu_spi_inst: entity work.mcu_spi 
 port map (
   clk            => clk,
-  reset          => not pll_locked,
+  reset          => not sys_jtagseln,
   -- SPI interface to BL616 MCU
   spi_io_ss      => spi_io_ss,      -- SPI CSn
   spi_io_clk     => spi_io_clk,     -- SPI SCLK
@@ -933,7 +928,7 @@ module_inst: entity work.sysctrl
  port map 
  (
   clk                 => clk,
-  reset               => not pll_locked,
+  reset               => not sys_jtagseln,
 --
   data_in_strobe      => mcu_sys_strobe,
   data_in_start       => mcu_start,
@@ -967,16 +962,16 @@ module_inst: entity work.sysctrl
   port_in_data        => open,
 
   int_out_n           => spi_intn,
-  int_in              => unsigned'("0000" & sdc_int & '0' & hid_int & '0'),
+  int_in              => unsigned'(x"0" & sdc_int & '0' & hid_int & '0'),
   int_ack             => int_ack,
 
-  buttons             => unsigned'(not key_user_n & not key_reset_n), -- S2 and S1 buttons
-  leds                => system_leds, -- two leds can be controlled from the MCU
+  buttons             => unsigned'(not key_user_n & not key_reset_n), -- S0 and S1 buttons
+  leds                => open, -- two leds can be controlled from the MCU
   color               => ws2812_color -- a 24bit color to e.g. be used to drive the ws2812
 );
 
-sd_rd(4) <= '0';
-sd_wr(4 downto 0) <= "00000";
+sd_rd(7 downto 4) <= x"0";
+sd_wr(7 downto 0) <= x"00";
 
   crt_inst : entity work.loader_sd_card
   port map (
@@ -993,10 +988,10 @@ sd_wr(4 downto 0) <= "00000";
     sd_rd_data        => sd_rd_data,
     sd_rd_byte_strobe => sd_rd_byte_strobe,
   
-    sd_img_mounted    => sd_img_mounted,
+    sd_img_mounted    => sd_img_mounted(4 downto 0),
     loader_busy       => loader_busy,
     load_crt          => load_crt,
-    sd_img_size       => sd_img_size,
+    sd_img_size       => sd_img_size(31 downto 0),
     leds              => open,
     img_select        => img_select,
     img_size_crt      => img_size_crt,
@@ -1121,8 +1116,8 @@ force_bs <= force_bs_i when img_present = '1' else force_bs_lock;
 pal <= '1' when system_video_std(1 downto 0) = 2 else 
        '0' when system_video_std(1 downto 0) = 1 else 
        paldetect;
-sc  <= '1' when system_sc(1 downto 0) = 2 else 
-       '0' when system_sc(1 downto 0) = 1 else 
+sc  <= '1' when system_sc(1 downto 0) = 2 else
+       '0' when system_sc(1 downto 0) = 1 else
        scdetect when img_present = '1' else
        sc_lock;
 
