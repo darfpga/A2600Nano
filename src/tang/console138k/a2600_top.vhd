@@ -300,6 +300,7 @@ signal btn_pause        : std_logic;
 signal spi_intn         : std_logic;
 signal boot_button_detected : std_logic := '1';
 signal sys_jtagseln     : std_logic;
+signal pll_locked_i     : std_logic;
 
 component CLKDIV
     generic (
@@ -317,16 +318,18 @@ begin
 
   -- enable JTAG if any button has been pressed during boot and also once
   -- the external FPGA Companion has been seen
-  jtagseln <= not bl616_jtagsel; -- or spi_ext);
-  sys_jtagseln <= not (not pll_locked or bl616_jtagsel);
+  jtagseln <= not (bl616_jtagsel or spi_ext);
+  sys_jtagseln <= not (not pll_locked_i or bl616_jtagsel);
 
   -- BL616 console to hw pins for external USB-UART adapter
   bl616_mon_tx <= uart_rx;
 
-  process (clk)
+  process (clk, pll_locked_i)
   begin
-    if rising_edge(clk) then
-      if pll_locked = '0' then
+    if pll_locked_i = '0' then
+      spi_ext <= '0';
+    elsif rising_edge(clk) then
+      if bl616_jtagsel = '1' then
         spi_ext <= '0';
       elsif pmod_companion_ss = '0' then
         spi_ext <= '1';
@@ -520,7 +523,7 @@ port map(
 
 mainclock: entity work.Gowin_PLL_ntsc_138k_MOD
     port map (
-      lock    => pll_locked,
+      lock    => pll_locked_i,
       clkout0 => clk_pixel_x5,
       clkin   => clk_50mhz,
       reset   => '0',
@@ -528,6 +531,8 @@ mainclock: entity work.Gowin_PLL_ntsc_138k_MOD
       lpfres  => (others => '0'),
       lpfcap  => (others => '0')
     );
+
+pll_locked <= sys_jtagseln;
 
 div1_inst: CLKDIV
 generic map(
@@ -1003,7 +1008,7 @@ sd_wr(7 downto 0) <= x"00";
     ioctl_wait        => ioctl_wait
   );
 
-reset2600 <= system_reset(0) or not pll_locked or cart_download;
+reset2600 <= system_reset(0) or not pll_locked or cart_download or bl616_jtagsel;
 
 -- swap joysticks and paddle
 joy_p1 <= joyB when joyswap = '1' else joyA;
